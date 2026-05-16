@@ -1,0 +1,258 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  owner
+  admin
+  operator
+}
+
+enum LeadStatus {
+  new
+  analyzing
+  qualified
+  contacted
+  won
+  lost
+  archived
+}
+
+enum Priority {
+  low
+  medium
+  high
+  urgent
+}
+
+enum AIAnalysisStatus {
+  pending
+  completed
+  failed
+}
+
+enum LeadCategory {
+  sales_lead
+  support_request
+  partnership
+  spam
+  other
+}
+
+enum Sentiment {
+  negative
+  neutral
+  positive
+}
+
+enum TaskStatus {
+  open
+  in_progress
+  completed
+  canceled
+}
+
+enum WebhookDeliveryStatus {
+  pending
+  success
+  failed
+  retrying
+}
+
+model Organization {
+  id                  String               @id @default(cuid())
+  name                String
+  slug                String               @unique
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  users               User[]
+  leads               Lead[]
+  tasks               Task[]
+  webhookEndpoints    WebhookEndpoint[]
+  auditLogs           AuditLog[]
+  notificationSetting NotificationSetting?
+  apiKeys             ApiKey[]
+}
+
+model User {
+  id             String        @id @default(cuid())
+  email          String        @unique
+  name           String
+  passwordHash   String
+  role           UserRole
+  organizationId String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sessions       UserSession[]
+  assignedTasks  Task[]        @relation("TaskAssignee")
+  auditLogs      AuditLog[]
+
+  @@index([organizationId])
+}
+
+model UserSession {
+  id               String   @id @default(cuid())
+  userId           String
+  refreshTokenHash String
+  expiresAt        DateTime
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  lastUsedAt       DateTime?
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Lead {
+  id                  String            @id @default(cuid())
+  organizationId      String
+  source              String
+  name                String
+  email               String
+  company             String
+  website             String?
+  budgetRange         String
+  serviceNeeded       String
+  deadline            String
+  message             String
+  status              LeadStatus        @default(new)
+  priority            Priority          @default(medium)
+  leadScore           Int?
+  category            LeadCategory?
+  sentiment           Sentiment?
+  summary             String?
+  suggestedReply      String?
+  recommendedNextStep String?
+  aiAnalysisStatus    AIAnalysisStatus  @default(pending)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  organization        Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  analyses            AIAnalysis[]
+  tasks               Task[]
+  webhookDeliveries   WebhookDelivery[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([organizationId, priority])
+  @@index([organizationId, createdAt(sort: Desc)])
+}
+
+model AIAnalysis {
+  id          String   @id @default(cuid())
+  leadId      String
+  provider    String
+  model       String
+  rawInput    Json
+  rawOutput   Json
+  parsedOutput Json
+  costEstimate Float?
+  createdAt   DateTime @default(now())
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+}
+
+model Task {
+  id             String        @id @default(cuid())
+  organizationId String
+  leadId         String?
+  title          String
+  description    String
+  status         TaskStatus    @default(open)
+  dueAt          DateTime?
+  assignedToId   String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead           Lead?         @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  assignedTo     User?         @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([leadId])
+  @@index([assignedToId])
+  @@index([organizationId, status])
+}
+
+model WebhookEndpoint {
+  id             String            @id @default(cuid())
+  organizationId String
+  name           String
+  url            String
+  secret         String
+  isActive       Boolean           @default(true)
+  eventTypes     String[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  deliveries     WebhookDelivery[]
+
+  @@index([organizationId])
+}
+
+model WebhookDelivery {
+  id                String                 @id @default(cuid())
+  webhookEndpointId String
+  leadId            String?
+  eventType         String
+  payload           Json
+  status            WebhookDeliveryStatus  @default(pending)
+  responseStatus    Int?
+  responseBody      String?
+  attempts          Int                    @default(0)
+  nextRetryAt       DateTime?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  webhookEndpoint   WebhookEndpoint        @relation(fields: [webhookEndpointId], references: [id], onDelete: Cascade)
+  lead              Lead?                  @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@index([webhookEndpointId])
+  @@index([status])
+  @@index([leadId])
+}
+
+model AuditLog {
+  id             String       @id @default(cuid())
+  organizationId String
+  userId         String?
+  action         String
+  entityType     String
+  entityId       String?
+  metadata       Json?
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([entityType, entityId])
+  @@index([createdAt(sort: Desc)])
+}
+
+model NotificationSetting {
+  id                        String       @id @default(cuid())
+  organizationId            String       @unique
+  emailNotificationsEnabled Boolean      @default(false)
+  notifyEmail               String?
+  createdAt                 DateTime     @default(now())
+  updatedAt                 DateTime     @updatedAt
+  organization              Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model ApiKey {
+  id             String       @id @default(cuid())
+  organizationId String
+  name           String
+  keyHash        String
+  lastUsedAt     DateTime?
+  createdAt      DateTime     @default(now())
+  revokedAt      DateTime?
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}

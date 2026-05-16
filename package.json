@@ -1,0 +1,30 @@
+{
+  "name": "agencyops",
+  "private": true,
+  "version": "1.0.0",
+  "packageManager": "pnpm@10.0.0",
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev": "pnpm --filter @agencyops/api dev",
+    "dev:web": "pnpm --filter @agencyops/web dev",
+    "lint": "pnpm -r lint",
+    "pretypecheck": "pnpm --filter @agencyops/shared build",
+    "typecheck": "pnpm -r typecheck",
+    "pretest": "pnpm --filter @agencyops/shared build",
+    "test": "pnpm -r test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:migrate": "pnpm --filter @agencyops/api prisma migrate deploy",
+    "db:seed": "pnpm --filter @agencyops/api db:seed"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.26.0",
+    "@types/node": "^22.15.17",
+    "eslint": "^9.26.0",
+    "eslint-config-prettier": "^10.1.2",
+    "globals": "^16.0.0",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.32.0"
+  }
+}
