@@ -151,8 +151,8 @@ const demoLeadSeeds = [
 ];
 
 async function main() {
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('Seed script refuses to run in production.');
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEMO_SEED !== 'true') {
+    throw new Error('Seed script refuses to run in production unless ALLOW_DEMO_SEED=true is set.');
   }
 
   const organizationName = 'Northstar Digital Agency';
